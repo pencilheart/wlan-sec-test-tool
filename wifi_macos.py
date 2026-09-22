@@ -6,6 +6,7 @@ macOS WiFi 工具模块
 使用 CoreWLAN 框架进行主动扫描，system_profiler 作为备用方案
 """
 import subprocess
+from scan_bridge import scan_networks
 import re
 import time
 from typing import Optional, List, Dict
@@ -89,17 +90,8 @@ class MacOSWiFiInterface:
             return MacOSWiFiStatus.INACTIVE
 
     def scan(self) -> None:
-        """开始扫描 WiFi，使用 CoreWLAN 触发主动扫描"""
+        """标记扫描开始；由带定位授权的助手在 scan_results 中执行扫描。"""
         self._status = MacOSWiFiStatus.SCANNING
-        if HAS_COREWLAN:
-            try:
-                client = CWWiFiClient.sharedWiFiClient()
-                iface = client.interface()
-                if iface:
-                    # CoreWLAN 主动扫描，刷新系统缓存
-                    iface.scanForNetworksWithName_error_(None, None)
-            except Exception:
-                pass
 
     def _scan_with_corewlan(self) -> Optional[List[WiFiNetwork]]:
         """
@@ -267,22 +259,16 @@ class MacOSWiFiInterface:
             ))
 
     def scan_results(self) -> List[WiFiNetwork]:
-        """
-        获取扫描结果。
-        优先使用 CoreWLAN（需要定位服务授权），否则回退到 system_profiler。
-        """
-        # 优先尝试 CoreWLAN（完整且准确）
-        networks = self._scan_with_corewlan()
-        if networks is not None:
-            self._scan_results = networks
+        """通过 macOS 应用助手请求定位授权并读取扫描结果。"""
+        self._scan_results = []
+        try:
+            self._scan_results = [
+                WiFiNetwork(**network)
+                for network in scan_networks(self.interface_name)
+            ]
+            return self._scan_results
+        finally:
             self._status = MacOSWiFiStatus.DISCONNECTED
-            return networks
-
-        # 回退到 system_profiler（CoreWLAN 不可用或未授权定位服务）
-        networks = self._scan_with_system_profiler()
-        self._scan_results = networks
-        self._status = MacOSWiFiStatus.DISCONNECTED
-        return networks
 
     def disconnect(self) -> bool:
         """断开当前 WiFi 连接"""

@@ -153,3 +153,28 @@ Python ≥ 3.11.x（推荐：3.11.9）
 - Ubuntu 22.04 及以上版本 **（实验性）**
 - 其它支持 Python 3.11.x 以上的Linux系统 **（实验性）**
 - macOS 12 (Monterey) 及以上
+
+## macOS 定位权限与 Wi-Fi 扫描
+
+macOS 可能在未授权定位服务时隐藏扫描结果中的 SSID/BSSID。
+本项目使用独立的 WLAN Scan Helper.app 请求系统定位授权，并通过
+CoreWLAN 读取 Wi-Fi 名称；不请求或保存地理坐标。
+
+安装 macOS 依赖后，在项目目录构建助手（需要 Xcode Command Line Tools）：
+
+    # 尚未安装编译工具时，先执行 xcode-select --install
+    bash build_macos_helper.sh
+    python wlan_sec_test_tool.py
+
+首次点击“扫描WiFi”时，在 **WLAN Scan Helper** 的系统定位弹窗中选择允许。
+若拒绝，可前往“系统设置 → 隐私与安全性 → 定位服务”修改该应用的权限。
+授权等待超过两分钟会报错；处理好权限后重新扫描即可。
+
+助手源码为 WLANScanHelper.swift，应用说明与权限用途位于
+WLANScanHelper-Info.plist。构建产物采用本地临时签名，不提交到 Git。
+修改助手后需重新构建；重新构建后系统可能要求再次授权。
+扫描结果使用私有临时目录传回 Python，读取后删除。
+拒绝授权、扫描失败或名称仍被系统隐藏时，界面会显示错误。
+主程序原有日志和配置行为保持不变。
+
+此功能不修改连接测试逻辑。macOS 27 上的实际扫描效果仍需在用户授权后验证。
